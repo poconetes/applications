@@ -1,0 +1,58 @@
+apiVersion: poconetes.dev/v1
+kind: Application
+metadata:
+  name: census
+  labels:
+    team: blue
+spec:
+  image: nginx:1.1
+  environment:
+  - name: XX
+    value: YY
+  environmentRef:
+    kind: Secret
+    name: bla
+  mounts:
+  - path: /tmp/config
+    mountRef:
+      kind: Secret
+      name: bla
+  - path: /tmp/config
+    template:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "my-storage-class"
+      resources:
+        requests:
+          storage: 1Gi
+  formations:
+  - name: web
+    count: 2
+    args: [ "web" ]
+  - name: workers
+    count: 2
+---
+apiVersion: poconetes.dev/v1
+kind: Sidecar
+metadata:
+  name: census
+spec:
+  selector:
+    team: blue
+  image: nginx:1.1
+---
+apiVersion: poconetes.dev/v1
+kind: Initializer
+metadata:
+  name: census
+spec:
+  selector:
+    team: blue
+  image: nginx:1.1
+  environmentRef:
+    kind: Secret
+    name: bla
+  mounts:
+  - path: /tmp/config
+    mountRef:
+      kind: Secret
+      name: bla

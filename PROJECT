@@ -1,0 +1,25 @@
+version: "2"
+domain: poconetes.dev
+repo: github.com/lxfontes/poconetes
+resources:
+- group: apps
+  version: v1
+  kind: Source
+- group: apps
+  version: v1
+  kind: Formation
+- group: apps
+  version: v1
+  kind: Sidecar
+- group: apps
+  version: v1
+  kind: Initializer
+- group: apps
+  version: v1
+  kind: ClusterInitializer
+- group: apps
+  version: v1
+  kind: ClusterSidecar
+- group: apps
+  version: v1
+  kind: Application
