@@ -1,0 +1,10 @@
+apiVersion: apps.poconetes.dev/v1
+kind: Sidecar
+metadata:
+  name: metrics
+spec:
+  image: ubuntu
+  args: [ "sleep", "inf" ]
+  ports:
+  - name: metrics
+    port: 8080

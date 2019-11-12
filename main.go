@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	appsv1 "github.com/lxfontes/poconetes/api/v1"
 	"github.com/lxfontes/poconetes/controllers"
@@ -21,7 +22,6 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = appsv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -48,8 +48,10 @@ func main() {
 	}
 
 	if err = (&controllers.ApplicationReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Application"),
+		Client:       mgr.GetClient(),
+		Scheme:       scheme,
+		MaxReconcile: 30 * time.Second,
+		Log:          ctrl.Log.WithName("controllers").WithName("Application"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Application")
 		os.Exit(1)

@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  CONFIG_VAR: VALUE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret
+stringData:
+  SECRET_VAR: ANOTHER_VALUE
+---
+apiVersion: apps.poconetes.dev/v1
+kind: Application
+metadata:
+  name: full
+  labels:
+    custom: replicated-to-child-objects
+spec:
+  image: nginx:1.7.10
+  # mounts on all formation pocolets
+  mounts:
+  - path: /tmp/config
+    name: config
+    configMapRef:
+      name: config
+  # shares with all formation pocolets
+  environmentRefs:
+  - prefix: PREFIX_
+    configMapRef:
+      name: config
+      optional: true
+  - prefix: PP_ 
+    secretRef:
+      name: secret
+      optional: true
+  environment:
+  - name: VAR_ON_APP
+    value: TOP_LEVEL
+  formations:
+  - name: web
+    minReplicas: 2
+    maxReplicas: 2
+    # shared with web formation only
+    mounts:
+    - path: /tmp/secret
+      name: secret
+      secretRef:
+        name: secret
+    # formation vars override app vars in case of collision
+    environment:
+    - name: VAR_ON_FORMATION
+      value: OVERRIDES_APP_IF_DUPLICATE
+    ports:
+    - name: http
+      port: 80
+  - name: workers

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,13 +16,12 @@ const (
 
 // ApplicationSpec defines the desired state of Application
 type ApplicationSpec struct {
-	Image string `json:"image"`
-	// +optional
-	Environment []corev1.EnvVar `json:"environment"`
-	// +optional
-	Mounts []Mount `json:"mounts"`
 	// +required
 	Formations []Formation `json:"formations"`
+	// +required
+	Image string `json:"image"`
+
+	RunSpec `json:",inline"`
 }
 
 // Mount ...
@@ -31,35 +31,106 @@ type Mount struct {
 	// +required
 	Path string `json:"path"`
 	// +optional
-	Exclusive bool `json:"exclusive,omitempty"`
+	ConfigMap *corev1.LocalObjectReference `json:"configMapRef,omitempty"`
 	// +optional
-	Template *corev1.PersistentVolumeClaimSpec `json:"template,omitempty"`
-	// +optional
-	ObjectRef *corev1.ObjectReference `json:"objectRef,omitempty"`
+	Secret *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // Formation ...
 type Formation struct {
 	// +required
 	Name string `json:"name"`
-	// +required
-	MinReplicas int32 `json:"minReplicas"`
-	// +required
-	MaxReplicas int32 `json:"maxReplicas"`
 	// +optional
-	Cmd string `json:"cmd,omitempty"`
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// +optional
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+	// +optional
+	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
+
+	RunSpec `json:",inline"`
+}
+
+type RunSpec struct {
+	// +optional
+	Command []string `json:"cod,omitempty"`
 	// +optional
 	Args []string `json:"args,omitempty"`
 	// +optional
-	Ports []corev1.ContainerPort `json:"ports,omitempty"`
+	Ports []FormationPort `json:"ports,omitempty"`
+	// +optional
+	Environment []corev1.EnvVar `json:"environment,omitempty"`
+	// +optional
+	EnvironmentRefs []corev1.EnvFromSource `json:"environmentRefs,omitempty"`
+	// +optional
+	Mounts []Mount `json:"mounts,omitempty"`
+	// +optional
+	SLO *corev1.ResourceRequirements `json:"slo,omitempty"`
+}
+
+// FormationPort ...
+type FormationPort struct {
+	// +required
+	Name string `json:"name"`
+	// +required
+	Port int32 `json:"port,omitempty"`
+	// +optional
+	Protocol corev1.Protocol `json:"protocol,omitempty"`
 }
 
 // ApplicationStatus defines the observed state of Application
 type ApplicationStatus struct {
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ObservedGeneration int64             `json:"observedGeneration,omitempty"`
+	Formations         []FormationStatus `json:"formations,omitempty"`
+	Pocolets           int32             `json:"pocolets"`
+	State              ApplicationState  `json:"state"`
 }
 
+type ApplicationState string
+
+const (
+	ApplicationStateOnline  ApplicationState = "online"
+	ApplicationStateWaiting ApplicationState = "waiting"
+	ApplicationStateError   ApplicationState = "error"
+)
+
+// FormationStatus ...
+type FormationStatus struct {
+	Name                string         `json:"name,omitempty"`
+	State               FormationState `json:"state,omitempty"`
+	Message             string         `json:"message,omitempty"`
+	ReplicasDesired     int32          `json:"replicasDesired,omitempty"`
+	ReplicasAvailable   int32          `json:"replicasAvailable"`
+	ReplicasUnavailable int32          `json:"replicasUnavailable"`
+}
+
+type FormationStatuses []FormationStatus
+
+func (fs FormationStatuses) Len() int {
+	return len(fs)
+}
+
+func (fs FormationStatuses) Less(i, j int) bool {
+	return fs[i].Name < fs[j].Name
+}
+
+func (fs FormationStatuses) Swap(i, j int) {
+	fs[i], fs[j] = fs[j], fs[i]
+}
+
+type FormationState string
+
+const (
+	FormationStateOnline  FormationState = "online"
+	FormationStateWaiting FormationState = "waiting"
+	FormationStateError   FormationState = "error"
+)
+
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=app
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
+// +kubebuilder:printcolumn:name="Pocolets",type=string,JSONPath=`.status.pocolets`
 
 // Application is the Schema for the applications API
 type Application struct {
