@@ -1,10 +1,12 @@
 # 🐶 poconetes
 
-Poconetes is an attempt to provide a higher level of abstraction for running Rails on Kubernetes.
+Poconetes is an attempt to provide a higher level of abstraction for running Applications on Kubernetes.
 
 Assumptions:
-- 1 codebase, many services
-- Each service can be scaled independently
+- 1 codebase = 1 application
+- 1 application has many formations
+  - web, workers
+- Each formation can be scaled independently
 
 
 ## Minimal
@@ -84,3 +86,8 @@ spec:
 
 
 more samples in [config/samples](config/samples)
+
+
+### License
+
+MIT
