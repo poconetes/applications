@@ -86,8 +86,3 @@ spec:
 
 
 more samples in [config/samples](config/samples)
-
-
-### License
-
-MIT

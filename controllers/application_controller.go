@@ -32,10 +32,12 @@ type ApplicationReconciler struct {
 }
 
 // +kubebuilder:rbac:groups=apps.poconetes.dev,resources=applications,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=sidecars,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=initializers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.poconetes.dev,resources=applications/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.MaxReconcile)

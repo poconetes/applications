@@ -3,9 +3,34 @@ kind: Application
 metadata:
   name: minimal
 spec:
-  image: nginx:1.7.9
+  image: paulbouwer/hello-kubernetes:1.5
   formations:
   - name: web-minimal
+    environment:
+    - name: MESSAGE
+      value: hai poco
     ports:
     - name: http
-      port: 80
+      port: 8080
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: supersite
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - example.poconetes.dev
+    secretName: example-tls
+  rules:
+  - host: example.poconetes.dev
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: web-minimal
+          servicePort: 8080
