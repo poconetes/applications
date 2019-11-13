@@ -6,6 +6,8 @@ spec:
   image: paulbouwer/hello-kubernetes:1.5
   formations:
   - name: web-minimal
+    minReplicas: 3
+    maxReplicas: 5
     environment:
     - name: MESSAGE
       value: hai poco
