@@ -3,8 +3,12 @@ kind: Sidecar
 metadata:
   name: metrics
 spec:
-  image: ubuntu
-  args: [ "sleep", "inf" ]
+  image: paulbouwer/hello-kubernetes:1.5
+  environment:
+  - name: PORT
+    value: "8081"
+  - name: MESSAGE
+    value: im metrics
   ports:
   - name: metrics
-    port: 8080
+    port: 8081
