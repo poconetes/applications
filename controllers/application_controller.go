@@ -207,6 +207,22 @@ func (r *ApplicationReconciler) refreshService(ctx context.Context, ll logr.Logg
 		ports = append(ports, port)
 	}
 
+	sidecarList := &appsv1.SidecarList{}
+	if err := r.List(ctx, sidecarList, client.InNamespace(app.GetNamespace())); err != nil {
+		return err
+	}
+
+	for _, sidecar := range sidecarList.Items {
+		for _, p := range sidecar.Spec.Ports {
+			port := corev1.ServicePort{
+				Name:       p.Name,
+				Port:       p.Port,
+				TargetPort: intstr.FromString(p.Name),
+			}
+			ports = append(ports, port)
+		}
+	}
+
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       app.GetNamespace(),
