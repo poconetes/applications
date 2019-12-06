@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	appsv1 "github.com/lxfontes/poconetes/api/v1"
+	appsv1 "github.com/poconetes/applications/api/v1"
 	stappsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"

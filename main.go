@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	appsv1 "github.com/lxfontes/poconetes/api/v1"
-	"github.com/lxfontes/poconetes/controllers"
+	appsv1 "github.com/poconetes/applications/api/v1"
+	"github.com/poconetes/applications/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

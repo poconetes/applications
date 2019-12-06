@@ -1,6 +1,6 @@
 version: "2"
 domain: poconetes.dev
-repo: github.com/lxfontes/poconetes
+repo: github.com/poconetes/applications
 resources:
 - group: apps
   version: v1
