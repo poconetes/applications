@@ -641,6 +641,7 @@ func mergeEnvVar(envs ...[]corev1.EnvVar) []corev1.EnvVar {
 func int32Ptr(i int32) *int32 {
 	return &i
 }
+
 func boolPtr(t bool) *bool {
 	return &t
 }

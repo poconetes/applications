@@ -11,9 +11,6 @@ const (
 	LabelFormation = "poco-formation"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ApplicationSpec defines the desired state of Application
 type ApplicationSpec struct {
 	// +required
@@ -52,7 +49,7 @@ type Formation struct {
 
 type RunSpec struct {
 	// +optional
-	Command []string `json:"cod,omitempty"`
+	Command []string `json:"command,omitempty"`
 	// +optional
 	Args []string `json:"args,omitempty"`
 	// +optional
