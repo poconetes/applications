@@ -14,9 +14,13 @@ const (
 // ApplicationSpec defines the desired state of Application
 type ApplicationSpec struct {
 	// +required
-	Formations []Formation `json:"formations"`
-	// +required
 	Image string `json:"image"`
+	// +required
+	MaxReplicas int32 `json:"maxReplicas"`
+	// +optional
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// +optional
+	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
 
 	RunSpec `json:",inline"`
 }
@@ -31,20 +35,6 @@ type Mount struct {
 	ConfigMap *corev1.LocalObjectReference `json:"configMapRef,omitempty"`
 	// +optional
 	Secret *corev1.LocalObjectReference `json:"secretRef,omitempty"`
-}
-
-// Formation ...
-type Formation struct {
-	// +required
-	Name string `json:"name"`
-	// +optional
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
-	// +optional
-	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
-	// +optional
-	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
-
-	RunSpec `json:",inline"`
 }
 
 type RunSpec struct {
@@ -76,50 +66,22 @@ type FormationPort struct {
 
 // ApplicationStatus defines the observed state of Application
 type ApplicationStatus struct {
-	ObservedGeneration int64             `json:"observedGeneration,omitempty"`
-	Formations         []FormationStatus `json:"formations,omitempty"`
-	Pocolets           int32             `json:"pocolets"`
-	State              ApplicationState  `json:"state"`
+	ObservedGeneration  int64            `json:"observedGeneration,omitempty"`
+	State               ApplicationState `json:"state"`
+	Message             string           `json:"message,omitempty"`
+	ReplicasDesired     int32            `json:"replicasDesired,omitempty"`
+	ReplicasAvailable   int32            `json:"replicasAvailable"`
+	ReplicasUnavailable int32            `json:"replicasUnavailable"`
 }
 
 type ApplicationState string
 
 const (
+	ApplicationStateUnknown ApplicationState = ""
 	ApplicationStateOnline  ApplicationState = "online"
-	ApplicationStateWaiting ApplicationState = "waiting"
+	ApplicationStateIdle    ApplicationState = "idle"
+	ApplicationStateUpdate  ApplicationState = "update"
 	ApplicationStateError   ApplicationState = "error"
-)
-
-// FormationStatus ...
-type FormationStatus struct {
-	Name                string         `json:"name,omitempty"`
-	State               FormationState `json:"state,omitempty"`
-	Message             string         `json:"message,omitempty"`
-	ReplicasDesired     int32          `json:"replicasDesired,omitempty"`
-	ReplicasAvailable   int32          `json:"replicasAvailable"`
-	ReplicasUnavailable int32          `json:"replicasUnavailable"`
-}
-
-type FormationStatuses []FormationStatus
-
-func (fs FormationStatuses) Len() int {
-	return len(fs)
-}
-
-func (fs FormationStatuses) Less(i, j int) bool {
-	return fs[i].Name < fs[j].Name
-}
-
-func (fs FormationStatuses) Swap(i, j int) {
-	fs[i], fs[j] = fs[j], fs[i]
-}
-
-type FormationState string
-
-const (
-	FormationStateOnline  FormationState = "online"
-	FormationStateWaiting FormationState = "waiting"
-	FormationStateError   FormationState = "error"
 )
 
 // +kubebuilder:object:root=true

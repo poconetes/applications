@@ -1,5 +1,0 @@
-baseURL = "https://poconetes.dev/"
-languageCode = "en-us"
-title = "🐶 poconetes"
-theme = "book"
-pygmentsCodeFences = true

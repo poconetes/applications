@@ -19,6 +19,8 @@ metadata:
   labels:
     custom: replicated-to-child-objects
 spec:
+  minReplicas: 2
+  maxReplicas: 2
   image: nginx:1.7.10
   # mounts on all formation pocolets
   mounts:
@@ -39,21 +41,6 @@ spec:
   environment:
   - name: VAR_ON_APP
     value: TOP_LEVEL
-  formations:
-  - name: web
-    minReplicas: 2
-    maxReplicas: 2
-    # shared with web formation only
-    mounts:
-    - path: /tmp/secret
-      name: secret
-      secretRef:
-        name: secret
-    # formation vars override app vars in case of collision
-    environment:
-    - name: VAR_ON_FORMATION
-      value: OVERRIDES_APP_IF_DUPLICATE
-    ports:
-    - name: http
-      port: 80
-  - name: workers
+  ports:
+  - name: http
+    port: 80
