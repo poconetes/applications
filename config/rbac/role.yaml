@@ -21,7 +21,7 @@ rules:
 - apiGroups:
   - apps.poconetes.dev
   resources:
-  - applications
+  - formations
   verbs:
   - create
   - delete
@@ -33,7 +33,7 @@ rules:
 - apiGroups:
   - apps.poconetes.dev
   resources:
-  - applications/status
+  - formations/status
   verbs:
   - get
   - patch

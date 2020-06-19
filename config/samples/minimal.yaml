@@ -1,5 +1,5 @@
 apiVersion: apps.poconetes.dev/v1
-kind: Application
+kind: Formation
 metadata:
   name: minimal
 spec:

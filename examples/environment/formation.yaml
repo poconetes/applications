@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  WORKER_COUNT: "3"
+  OVERRIDE: "CONFIGMAP"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret
+stringData:
+  WORKER_PASSWORD: "supersecret"
+  OVERRIDE: "SECRET"
+---
+apiVersion: apps.poconetes.dev/v1
+kind: Formation
+metadata:
+  name: environment
+spec:
+  minReplicas: 1
+  maxReplicas: 1
+  image: ubuntu:16.04
+  command: ["bin/sh","-c"]
+  args: ["env && sleep inf"]
+  environmentRefs:
+  - prefix: CONFIG_
+    configMapRef:
+      name: config
+      optional: true
+  - prefix: SECRET_ 
+    secretRef:
+      name: secret
+      optional: true
+  environment: # can override env vars from configmaps/secrets
+  - name: CONFIG_OVERRIDE
+    value: AT_TOP_LEVEL
+  - name: SECRET_OVERRIDE
+    value: AT_TOP_LEVEL

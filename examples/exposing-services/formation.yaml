@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: example.poconetes.dev
+spec:
+  tls:
+  - hosts:
+    - example.poconetes.dev
+    secretName: example-tls
+  rules:
+  - host: example.poconetes.dev
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: web
+          servicePort: 8080
+---
+apiVersion: apps.poconetes.dev/v1
+kind: Formation
+metadata:
+  name: web
+spec:
+  image: paulbouwer/hello-kubernetes:1.5
+  minReplicas: 1
+  maxReplicas: 3
+  environment:
+  - name: MESSAGE
+    value: hai poco
+  ports:
+  - name: http
+    port: 8080

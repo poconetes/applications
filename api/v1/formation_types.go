@@ -7,12 +7,11 @@ import (
 )
 
 const (
-	LabelApp       = "poco-app"
 	LabelFormation = "poco-formation"
 )
 
-// ApplicationSpec defines the desired state of Application
-type ApplicationSpec struct {
+// FormationSpec defines the desired state of Formation
+type FormationSpec struct {
 	// +required
 	Image string `json:"image"`
 	// +required
@@ -64,51 +63,52 @@ type FormationPort struct {
 	Protocol corev1.Protocol `json:"protocol,omitempty"`
 }
 
-// ApplicationStatus defines the observed state of Application
-type ApplicationStatus struct {
-	ObservedGeneration  int64            `json:"observedGeneration,omitempty"`
-	State               ApplicationState `json:"state"`
-	Message             string           `json:"message,omitempty"`
-	ReplicasDesired     int32            `json:"replicasDesired,omitempty"`
-	ReplicasAvailable   int32            `json:"replicasAvailable"`
-	ReplicasUnavailable int32            `json:"replicasUnavailable"`
+// FormationStatus defines the observed state of Formation
+type FormationStatus struct {
+	ObservedGeneration  int64          `json:"observedGeneration,omitempty"`
+	State               FormationState `json:"state"`
+	Message             string         `json:"message,omitempty"`
+	ReplicasDesired     int32          `json:"replicasDesired,omitempty"`
+	ReplicasAvailable   int32          `json:"replicasAvailable"`
+	ReplicasUnavailable int32          `json:"replicasUnavailable"`
 }
 
-type ApplicationState string
+type FormationState string
 
 const (
-	ApplicationStateUnknown ApplicationState = ""
-	ApplicationStateOnline  ApplicationState = "online"
-	ApplicationStateIdle    ApplicationState = "idle"
-	ApplicationStateUpdate  ApplicationState = "update"
-	ApplicationStateError   ApplicationState = "error"
+	FormationStateUnknown FormationState = ""
+	FormationStateOnline  FormationState = "online"
+	FormationStateIdle    FormationState = "idle"
+	FormationStateUpdate  FormationState = "update"
+	FormationStateError   FormationState = "error"
 )
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=app
+// +kubebuilder:resource:shortName=form
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="Image",type=string,JSONPath=`.spec.image`
-// +kubebuilder:printcolumn:name="Pocolets",type=string,JSONPath=`.status.pocolets`
+// +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.status.replicasDesired`
+// +kubebuilder:printcolumn:name="Available",type=integer,JSONPath=`.status.replicasAvailable`
 
-// Application is the Schema for the applications API
-type Application struct {
+// Formation is the Schema for the formation API
+type Formation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ApplicationSpec   `json:"spec,omitempty"`
-	Status ApplicationStatus `json:"status,omitempty"`
+	Spec   FormationSpec   `json:"spec,omitempty"`
+	Status FormationStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ApplicationList contains a list of Application
-type ApplicationList struct {
+// FormationList contains a list of Formation
+type FormationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Application `json:"items"`
+	Items           []Formation `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Application{}, &ApplicationList{})
+	SchemeBuilder.Register(&Formation{}, &FormationList{})
 }

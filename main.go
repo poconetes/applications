@@ -47,15 +47,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ApplicationReconciler{
+	if err = (&controllers.FormationReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       scheme,
 		MaxReconcile: 30 * time.Second,
-		Log:          ctrl.Log.WithName("controllers").WithName("Application"),
+		Log:          ctrl.Log.WithName("controllers").WithName("Formation"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Application")
+		setupLog.Error(err, "unable to create controller", "controller", "Formation")
 		os.Exit(1)
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -12,6 +13,8 @@ const (
 
 // PlanSpec defines the desired state of Plan
 type PlanSpec struct {
+	// +optional
+	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 	// +optional

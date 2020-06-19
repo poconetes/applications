@@ -23,81 +23,85 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// ApplicationReconciler reconciles a Application object
-type ApplicationReconciler struct {
+// FormationReconciler reconciles a Formation object
+type FormationReconciler struct {
 	client.Client
 	MaxReconcile time.Duration
 	Log          logr.Logger
 	Scheme       *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=applications,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=formations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.poconetes.dev,resources=sidecars,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.poconetes.dev,resources=initializers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=applications/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.poconetes.dev,resources=formations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
-func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *FormationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.MaxReconcile)
 	defer cancel()
 
-	ll := r.Log.WithValues("application", req.NamespacedName)
+	ll := r.Log.WithValues("formation", req.NamespacedName)
 
-	app := &appsv1.Application{}
-	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
+	formation := &appsv1.Formation{}
+	if err := r.Get(ctx, req.NamespacedName, formation); err != nil {
 		if apierrors.IsNotFound(err) {
 			ll.Info("not found, skipping")
 			return ctrl.Result{}, nil
 		}
 	}
 
-	if app.GetGeneration() != app.Status.ObservedGeneration {
-		if err := r.refreshObjects(ctx, ll, app); err != nil {
+	if formation.GetGeneration() != formation.Status.ObservedGeneration {
+		if err := r.refreshObjects(ctx, ll, formation); err != nil {
 			ll.Error(err, "refreshing objects")
 			return ctrl.Result{}, err
 		}
 
-		app.Status.ObservedGeneration = app.GetGeneration()
-		return ctrl.Result{}, r.Status().Update(ctx, app)
+		formation.Status.ObservedGeneration = formation.GetGeneration()
+		return ctrl.Result{}, r.Status().Update(ctx, formation)
 	}
 
-	oldStatus := app.Status
-	if err := r.refreshStatus(ctx, ll, app); err != nil {
+	oldStatus := formation.Status
+	if err := r.refreshStatus(ctx, ll, formation); err != nil {
 		ll.Error(err, "refreshing status")
 		return ctrl.Result{}, err
 	}
 
-	if !reflect.DeepEqual(app.Status, oldStatus) {
+	if !reflect.DeepEqual(formation.Status, oldStatus) {
 		ll.Info("updating status")
-		return ctrl.Result{}, r.Status().Update(ctx, app)
+		return ctrl.Result{}, r.Status().Update(ctx, formation)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *ApplicationReconciler) refreshObjects(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
-	if err := r.refreshService(ctx, ll, app); err != nil {
+func (r *FormationReconciler) refreshObjects(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) error {
+	plan, err := r.planFor(ctx, ll, formation)
+	if err != nil {
 		return err
 	}
-	if err := r.refreshDeployment(ctx, ll, app); err != nil {
+	if err := r.refreshService(ctx, ll, formation); err != nil {
 		return err
 	}
-	if err := r.refreshAutoscaler(ctx, ll, app); err != nil {
+	if err := r.refreshDeployment(ctx, ll, plan, formation); err != nil {
+		return err
+	}
+	if err := r.refreshAutoscaler(ctx, ll, plan, formation); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *ApplicationReconciler) refreshService(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
+func (r *FormationReconciler) refreshService(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) error {
 	wantLabels := map[string]string{
-		appsv1.LabelApp: app.GetName(),
+		appsv1.LabelFormation: formation.GetName(),
 	}
 
 	ports := []corev1.ServicePort{}
-	for _, p := range app.Spec.Ports {
+	for _, p := range formation.Spec.Ports {
 		port := corev1.ServicePort{
 			Name:       p.Name,
 			Port:       p.Port,
@@ -107,7 +111,7 @@ func (r *ApplicationReconciler) refreshService(ctx context.Context, ll logr.Logg
 	}
 
 	sidecarList := &appsv1.SidecarList{}
-	if err := r.List(ctx, sidecarList, client.InNamespace(app.GetNamespace())); err != nil {
+	if err := r.List(ctx, sidecarList, client.InNamespace(formation.GetNamespace())); err != nil {
 		return err
 	}
 
@@ -124,10 +128,10 @@ func (r *ApplicationReconciler) refreshService(ctx context.Context, ll logr.Logg
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:       app.GetNamespace(),
-			Name:            app.GetName(),
-			Labels:          mergeLabels(app.GetLabels(), wantLabels),
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(app, app.GroupVersionKind())},
+			Namespace:       formation.GetNamespace(),
+			Name:            formation.GetName(),
+			Labels:          mergeLabels(formation.GetLabels(), wantLabels),
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(formation, formation.GroupVersionKind())},
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: corev1.ClusterIPNone,
@@ -139,65 +143,62 @@ func (r *ApplicationReconciler) refreshService(ctx context.Context, ll logr.Logg
 	_, err := controllerutil.CreateOrUpdate(ctx, r, service, func() error {
 		service.Spec.Selector = wantLabels
 		service.Spec.Ports = ports
-		service.SetLabels(mergeLabels(service.GetLabels(), app.GetLabels(), wantLabels))
-		return controllerutil.SetControllerReference(app, service, r.Scheme)
+		service.SetLabels(mergeLabels(service.GetLabels(), formation.GetLabels(), wantLabels))
+		return controllerutil.SetControllerReference(formation, service, r.Scheme)
 	})
 	return err
 }
 
-func (r *ApplicationReconciler) refreshAutoscaler(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
+func (r *FormationReconciler) refreshAutoscaler(ctx context.Context, ll logr.Logger, plan *appsv1.Plan, formation *appsv1.Formation) error {
 	wantLabels := map[string]string{
-		appsv1.LabelApp: app.GetName(),
+		appsv1.LabelFormation: formation.GetName(),
 	}
 
 	spec := autoscaling.HorizontalPodAutoscalerSpec{
 		ScaleTargetRef: autoscaling.CrossVersionObjectReference{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
-			Name:       app.GetName(),
+			Name:       formation.GetName(),
 		},
-		MinReplicas: app.Spec.MinReplicas,
-		MaxReplicas: app.Spec.MaxReplicas,
-		Metrics:     app.Spec.Scaling,
+		MinReplicas: formation.Spec.MinReplicas,
+		MaxReplicas: formation.Spec.MaxReplicas,
+		Metrics:     formation.Spec.Scaling,
 	}
 
 	if len(spec.Metrics) == 0 {
-		spec.Metrics = append(spec.Metrics, autoscaling.MetricSpec{
-			Type: autoscaling.ResourceMetricSourceType,
-			Resource: &autoscaling.ResourceMetricSource{
-				Name: corev1.ResourceCPU,
-				Target: autoscaling.MetricTarget{
-					Type:               autoscaling.UtilizationMetricType,
-					AverageUtilization: int32Ptr(80),
-				},
-			},
-		})
+		spec.Metrics = plan.Spec.Scaling
 	}
 
 	hpa := &autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:       app.GetNamespace(),
-			Name:            app.GetName(),
-			Labels:          mergeLabels(app.GetLabels(), wantLabels),
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(app, app.GroupVersionKind())},
+			Namespace:       formation.GetNamespace(),
+			Name:            formation.GetName(),
+			Labels:          mergeLabels(formation.GetLabels(), wantLabels),
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(formation, formation.GroupVersionKind())},
 		},
 		Spec: spec,
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r, hpa, func() error {
 		hpa.Spec = spec
-		hpa.SetLabels(mergeLabels(hpa.GetLabels(), app.GetLabels(), wantLabels))
-		return controllerutil.SetControllerReference(app, hpa, r.Scheme)
+		hpa.SetLabels(mergeLabels(hpa.GetLabels(), formation.GetLabels(), wantLabels))
+		return controllerutil.SetControllerReference(formation, hpa, r.Scheme)
 	})
 	return err
 }
 
-func (r *ApplicationReconciler) planFor(ctx context.Context, ll logr.Logger, app *appsv1.Application) (*appsv1.Plan, error) {
-	planName := app.Spec.Plan
-	if planName == "" {
-		planName = appsv1.DefaultPlanName
+func (r *FormationReconciler) planFor(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) (*appsv1.Plan, error) {
+	plan := &appsv1.Plan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: appsv1.DefaultPlanName,
+		},
 	}
-	plan := &appsv1.Plan{}
+
+	planName := formation.Spec.Plan
+	if planName == "" {
+		planName = plan.GetName()
+	}
+
 	if err := r.Get(ctx, types.NamespacedName{Name: planName}, plan); err != nil {
 		return nil, err
 	}
@@ -205,14 +206,14 @@ func (r *ApplicationReconciler) planFor(ctx context.Context, ll logr.Logger, app
 	return plan, nil
 }
 
-func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
-	plan, err := r.planFor(ctx, ll, app)
-	if err != nil {
-		return err
+func (r *FormationReconciler) refreshDeployment(ctx context.Context, ll logr.Logger, plan *appsv1.Plan, formation *appsv1.Formation) error {
+	wantLabels := map[string]string{
+		appsv1.LabelFormation: formation.GetName(),
 	}
 
-	wantLabels := map[string]string{
-		appsv1.LabelApp: app.GetName(),
+	defaultLabels := map[string]string{
+		appsv1.LabelPlan:      plan.GetName(),
+		appsv1.LabelFormation: formation.GetName(),
 	}
 
 	defaultMounts := []appsv1.Mount{
@@ -225,7 +226,7 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 	defaultEnv := []corev1.EnvVar{
 		{
 			Name:  "POCO_REVISION",
-			Value: strconv.FormatInt(app.GetGeneration(), 10),
+			Value: strconv.FormatInt(formation.GetGeneration(), 10),
 		},
 	}
 
@@ -233,10 +234,10 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 		Selector: &metav1.LabelSelector{
 			MatchLabels: wantLabels,
 		},
-		Replicas: app.Spec.MinReplicas,
+		Replicas: formation.Spec.MinReplicas,
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: mergeLabels(app.GetLabels(), wantLabels),
+				Labels: mergeLabels(formation.GetLabels(), wantLabels),
 			},
 			Spec: corev1.PodSpec{
 				EnableServiceLinks:           boolPtr(false),
@@ -256,19 +257,19 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 
 	container := corev1.Container{
 		Name:         "pocolet",
-		Image:        app.Spec.Image,
-		Command:      app.Spec.Command,
-		Args:         app.Spec.Args,
-		EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs),
-		Env:          mergeEnvVar(app.Spec.Environment, defaultEnv),
-		VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts),
+		Image:        formation.Spec.Image,
+		Command:      formation.Spec.Command,
+		Args:         formation.Spec.Args,
+		EnvFrom:      mergeEnvFromSource(formation.Spec.EnvironmentRefs),
+		Env:          mergeEnvVar(formation.Spec.Environment, defaultEnv),
+		VolumeMounts: mergeMounts(defaultMounts, formation.Spec.Mounts),
 	}
 
 	if plan.Spec.ContainerResources != nil {
 		container.Resources = *plan.Spec.ContainerResources
 	}
 
-	for _, p := range app.Spec.Ports {
+	for _, p := range formation.Spec.Ports {
 		port := corev1.ContainerPort{
 			Name:          p.Name,
 			ContainerPort: p.Port,
@@ -278,10 +279,10 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 
 	spec.Template.Spec.Containers = append(spec.Template.Spec.Containers, container)
 
-	allVolumes := append([]appsv1.Mount{}, app.Spec.Mounts...)
+	allVolumes := append([]appsv1.Mount{}, formation.Spec.Mounts...)
 
 	sidecarList := &appsv1.SidecarList{}
-	if err := r.List(ctx, sidecarList, client.InNamespace(app.GetNamespace())); err != nil {
+	if err := r.List(ctx, sidecarList, client.InNamespace(formation.GetNamespace())); err != nil {
 		return err
 	}
 
@@ -291,9 +292,9 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 			Image:        sidecar.Spec.Image,
 			Command:      sidecar.Spec.Command,
 			Args:         sidecar.Spec.Args,
-			EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs, sidecar.Spec.EnvironmentRefs),
-			Env:          mergeEnvVar(app.Spec.Environment, sidecar.Spec.Environment, defaultEnv),
-			VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts, sidecar.Spec.Mounts),
+			EnvFrom:      mergeEnvFromSource(formation.Spec.EnvironmentRefs, sidecar.Spec.EnvironmentRefs),
+			Env:          mergeEnvVar(formation.Spec.Environment, sidecar.Spec.Environment, defaultEnv),
+			VolumeMounts: mergeMounts(defaultMounts, formation.Spec.Mounts, sidecar.Spec.Mounts),
 		}
 
 		if plan.Spec.SidecarResources != nil {
@@ -314,7 +315,7 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 	}
 
 	initializerList := &appsv1.InitializerList{}
-	if err := r.List(ctx, initializerList, client.InNamespace(app.GetNamespace())); err != nil {
+	if err := r.List(ctx, initializerList, client.InNamespace(formation.GetNamespace())); err != nil {
 		return err
 	}
 
@@ -324,9 +325,9 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 			Image:        initializer.Spec.Image,
 			Command:      initializer.Spec.Command,
 			Args:         initializer.Spec.Args,
-			EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs, initializer.Spec.EnvironmentRefs),
-			Env:          mergeEnvVar(app.Spec.Environment, initializer.Spec.Environment, defaultEnv),
-			VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts, initializer.Spec.Mounts),
+			EnvFrom:      mergeEnvFromSource(formation.Spec.EnvironmentRefs, initializer.Spec.EnvironmentRefs),
+			Env:          mergeEnvVar(formation.Spec.Environment, initializer.Spec.Environment, defaultEnv),
+			VolumeMounts: mergeMounts(defaultMounts, formation.Spec.Mounts, initializer.Spec.Mounts),
 		}
 
 		if plan.Spec.InitializerResources != nil {
@@ -344,72 +345,77 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 
 	deploy := &stappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            app.GetName(),
-			Namespace:       app.GetNamespace(),
-			Labels:          mergeLabels(app.GetLabels(), wantLabels),
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(app, app.GroupVersionKind())},
+			Name:            formation.GetName(),
+			Namespace:       formation.GetNamespace(),
+			Labels:          mergeLabels(formation.GetLabels(), defaultLabels),
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(formation, formation.GroupVersionKind())},
 		},
 		Spec: spec,
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r, deploy, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, r, deploy, func() error {
 		spec.Replicas = deploy.Spec.Replicas // keep this stable, as HPA will be the one controlling it
 		deploy.Spec = spec
-		deploy.SetLabels(mergeLabels(deploy.GetLabels(), app.GetLabels(), wantLabels))
-		return controllerutil.SetControllerReference(app, deploy, r.Scheme)
+		deploy.SetLabels(mergeLabels(deploy.GetLabels(), formation.GetLabels(), wantLabels))
+		return controllerutil.SetControllerReference(formation, deploy, r.Scheme)
 	})
 	return err
 }
 
-func (r *ApplicationReconciler) refreshStatus(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
+func (r *FormationReconciler) refreshStatus(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) error {
 	deploy := &stappsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: app.GetNamespace(), Name: app.GetName()}, deploy); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: formation.GetNamespace(), Name: formation.GetName()}, deploy); err != nil {
 		if apierrors.IsNotFound(err) {
-			app.Status.State = appsv1.ApplicationStateError
-			app.Status.Message = "deployment not found"
+			formation.Status.State = appsv1.FormationStateError
+			formation.Status.Message = "deployment not found"
 			return nil
 		}
 	}
 
-	if !metav1.IsControlledBy(deploy, app) {
+	if !metav1.IsControlledBy(deploy, formation) {
 		ll.Info("invalid owner for deployment")
-		app.Status.State = appsv1.ApplicationStateError
-		app.Status.Message = "invalid deployment ownership"
+		formation.Status.State = appsv1.FormationStateError
+		formation.Status.Message = "invalid deployment ownership"
 		return nil
 	}
 
-	app.Status.ReplicasDesired = *deploy.Spec.Replicas
-	app.Status.ReplicasAvailable = deploy.Status.AvailableReplicas
-	app.Status.ReplicasUnavailable = deploy.Status.UnavailableReplicas
+	formation.Status.ReplicasDesired = *deploy.Spec.Replicas
+	formation.Status.ReplicasAvailable = deploy.Status.AvailableReplicas
+	formation.Status.ReplicasUnavailable = deploy.Status.UnavailableReplicas
 
 	if deploy.Status.ObservedGeneration != deploy.GetGeneration() {
-		app.Status.State = appsv1.ApplicationStateUpdate
-		app.Status.Message = "deployment being created"
+		formation.Status.State = appsv1.FormationStateUpdate
+		formation.Status.Message = "deployment being created"
 		return nil
 	}
 
 	if deploy.Status.ReadyReplicas == deploy.Status.UpdatedReplicas &&
 		deploy.Status.UnavailableReplicas == 0 {
-		app.Status.State = appsv1.ApplicationStateOnline
-		app.Status.Message = ""
+		formation.Status.State = appsv1.FormationStateOnline
+		formation.Status.Message = ""
 		return nil
 	}
 
 	if deploy.Status.Replicas != deploy.Status.UpdatedReplicas {
-		app.Status.State = appsv1.ApplicationStateUpdate
-		app.Status.Message = "rolling out"
+		formation.Status.State = appsv1.FormationStateUpdate
+		formation.Status.Message = "rolling out"
 		return nil
 	}
 
-	app.Status.State = appsv1.ApplicationStateError
-	app.Status.Message = "could not determine state"
+	if deploy.Status.UnavailableReplicas > 0 {
+		formation.Status.State = appsv1.FormationStateError
+		formation.Status.Message = "replica crashed"
+	}
+
+	formation.Status.State = appsv1.FormationStateError
+	formation.Status.Message = "could not determine state"
 
 	return nil
 }
 
-func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *FormationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Application{}).
+		For(&appsv1.Formation{}).
 		Owns(&stappsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&autoscaling.HorizontalPodAutoscaler{}).

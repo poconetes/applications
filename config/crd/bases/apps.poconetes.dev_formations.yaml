@@ -6,7 +6,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
-  name: applications.apps.poconetes.dev
+  name: formations.apps.poconetes.dev
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.state
@@ -15,23 +15,26 @@ spec:
   - JSONPath: .spec.image
     name: Image
     type: string
-  - JSONPath: .status.pocolets
-    name: Pocolets
-    type: string
+  - JSONPath: .status.replicasDesired
+    name: Replicas
+    type: integer
+  - JSONPath: .status.replicasAvailable
+    name: Available
+    type: integer
   group: apps.poconetes.dev
   names:
-    kind: Application
-    listKind: ApplicationList
-    plural: applications
+    kind: Formation
+    listKind: FormationList
+    plural: formations
     shortNames:
-    - app
-    singular: application
+    - form
+    singular: formation
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: Application is the Schema for the applications API
+      description: Formation is the Schema for the formation API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -46,7 +49,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: ApplicationSpec defines the desired state of Application
+          description: FormationSpec defines the desired state of Formation
           properties:
             args:
               items:
@@ -644,38 +647,12 @@ spec:
                 - type
                 type: object
               type: array
-            slo:
-              description: ResourceRequirements describes the compute resource requirements.
-              properties:
-                limits:
-                  additionalProperties:
-                    anyOf:
-                    - type: integer
-                    - type: string
-                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                    x-kubernetes-int-or-string: true
-                  description: 'Limits describes the maximum amount of compute resources
-                    allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                  type: object
-                requests:
-                  additionalProperties:
-                    anyOf:
-                    - type: integer
-                    - type: string
-                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                    x-kubernetes-int-or-string: true
-                  description: 'Requests describes the minimum amount of compute resources
-                    required. If Requests is omitted for a container, it defaults
-                    to Limits if that is explicitly specified, otherwise to an implementation-defined
-                    value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                  type: object
-              type: object
           required:
           - image
           - maxReplicas
           type: object
         status:
-          description: ApplicationStatus defines the observed state of Application
+          description: FormationStatus defines the observed state of Formation
           properties:
             message:
               type: string
