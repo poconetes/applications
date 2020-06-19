@@ -21,6 +21,8 @@ type ApplicationSpec struct {
 	MinReplicas *int32 `json:"minReplicas,omitempty"`
 	// +optional
 	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
+	// +Optional
+	Plan string `json:"plan,omitempty"`
 
 	RunSpec `json:",inline"`
 }
@@ -50,8 +52,6 @@ type RunSpec struct {
 	EnvironmentRefs []corev1.EnvFromSource `json:"environmentRefs,omitempty"`
 	// +optional
 	Mounts []Mount `json:"mounts,omitempty"`
-	// +optional
-	SLO *corev1.ResourceRequirements `json:"slo,omitempty"`
 }
 
 // FormationPort ...

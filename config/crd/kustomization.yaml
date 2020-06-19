@@ -5,6 +5,7 @@ resources:
 - bases/apps.poconetes.dev_applications.yaml
 - bases/apps.poconetes.dev_initializers.yaml
 - bases/apps.poconetes.dev_sidecars.yaml
+- bases/apps.poconetes.dev_plans.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

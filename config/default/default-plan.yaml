@@ -1,0 +1,10 @@
+apiVersion: apps.poconetes.dev/v1
+kind: Plan
+metadata:
+  name: default
+spec:
+  container_resources:
+    requests:
+      memory: "250Mi"
+    limits:
+      memory:  "512Mi"

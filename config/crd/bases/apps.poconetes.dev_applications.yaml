@@ -229,6 +229,8 @@ spec:
                 - path
                 type: object
               type: array
+            plan:
+              type: string
             ports:
               items:
                 description: FormationPort ...

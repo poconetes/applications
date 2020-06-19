@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -13,7 +14,6 @@ import (
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,7 +53,7 @@ func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 	}
 
-	if app.Status.ObservedGeneration != app.GetGeneration() {
+	if app.GetGeneration() != app.Status.ObservedGeneration {
 		if err := r.refreshObjects(ctx, ll, app); err != nil {
 			ll.Error(err, "refreshing objects")
 			return ctrl.Result{}, err
@@ -192,7 +192,25 @@ func (r *ApplicationReconciler) refreshAutoscaler(ctx context.Context, ll logr.L
 	return err
 }
 
+func (r *ApplicationReconciler) planFor(ctx context.Context, ll logr.Logger, app *appsv1.Application) (*appsv1.Plan, error) {
+	planName := app.Spec.Plan
+	if planName == "" {
+		planName = appsv1.DefaultPlanName
+	}
+	plan := &appsv1.Plan{}
+	if err := r.Get(ctx, types.NamespacedName{Name: planName}, plan); err != nil {
+		return nil, err
+	}
+
+	return plan, nil
+}
+
 func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.Logger, app *appsv1.Application) error {
+	plan, err := r.planFor(ctx, ll, app)
+	if err != nil {
+		return err
+	}
+
 	wantLabels := map[string]string{
 		appsv1.LabelApp: app.GetName(),
 	}
@@ -201,6 +219,13 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 		{
 			Name: "pocoshare",
 			Path: "/pocoshare",
+		},
+	}
+
+	defaultEnv := []corev1.EnvVar{
+		{
+			Name:  "POCO_REVISION",
+			Value: strconv.FormatInt(app.GetGeneration(), 10),
 		},
 	}
 
@@ -214,7 +239,9 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 				Labels: mergeLabels(app.GetLabels(), wantLabels),
 			},
 			Spec: corev1.PodSpec{
-				EnableServiceLinks: boolPtr(false),
+				EnableServiceLinks:           boolPtr(false),
+				AutomountServiceAccountToken: boolPtr(false),
+				Affinity:                     plan.Spec.Affinity,
 				Volumes: []corev1.Volume{
 					{
 						Name: "pocoshare",
@@ -227,28 +254,18 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 		},
 	}
 
-	defaultResources := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU: resource.MustParse("0.250"),
-		},
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU: resource.MustParse("0.05"),
-		},
-	}
-
 	container := corev1.Container{
 		Name:         "pocolet",
 		Image:        app.Spec.Image,
 		Command:      app.Spec.Command,
 		Args:         app.Spec.Args,
 		EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs),
-		Env:          mergeEnvVar(app.Spec.Environment),
+		Env:          mergeEnvVar(app.Spec.Environment, defaultEnv),
 		VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts),
-		Resources:    defaultResources,
 	}
 
-	if app.Spec.SLO != nil {
-		container.Resources = *app.Spec.SLO
+	if plan.Spec.ContainerResources != nil {
+		container.Resources = *plan.Spec.ContainerResources
 	}
 
 	for _, p := range app.Spec.Ports {
@@ -270,18 +287,17 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 
 	for _, sidecar := range sidecarList.Items {
 		sidecarContainer := corev1.Container{
-			Name:         sidecar.GetName(),
+			Name:         "sidecar-" + sidecar.GetName(),
 			Image:        sidecar.Spec.Image,
 			Command:      sidecar.Spec.Command,
 			Args:         sidecar.Spec.Args,
 			EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs, sidecar.Spec.EnvironmentRefs),
-			Env:          mergeEnvVar(app.Spec.Environment, sidecar.Spec.Environment),
+			Env:          mergeEnvVar(app.Spec.Environment, sidecar.Spec.Environment, defaultEnv),
 			VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts, sidecar.Spec.Mounts),
-			Resources:    defaultResources,
 		}
 
-		if sidecar.Spec.SLO != nil {
-			sidecarContainer.Resources = *sidecar.Spec.SLO
+		if plan.Spec.SidecarResources != nil {
+			sidecarContainer.Resources = *plan.Spec.SidecarResources
 		}
 
 		for _, p := range sidecar.Spec.Ports {
@@ -304,18 +320,17 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 
 	for _, initializer := range initializerList.Items {
 		initializerContainer := corev1.Container{
-			Name:         initializer.GetName(),
+			Name:         "init-" + initializer.GetName(),
 			Image:        initializer.Spec.Image,
 			Command:      initializer.Spec.Command,
 			Args:         initializer.Spec.Args,
 			EnvFrom:      mergeEnvFromSource(app.Spec.EnvironmentRefs, initializer.Spec.EnvironmentRefs),
-			Env:          mergeEnvVar(app.Spec.Environment, initializer.Spec.Environment),
+			Env:          mergeEnvVar(app.Spec.Environment, initializer.Spec.Environment, defaultEnv),
 			VolumeMounts: mergeMounts(defaultMounts, app.Spec.Mounts, initializer.Spec.Mounts),
-			Resources:    defaultResources,
 		}
 
-		if initializer.Spec.SLO != nil {
-			initializerContainer.Resources = *initializer.Spec.SLO
+		if plan.Spec.InitializerResources != nil {
+			initializerContainer.Resources = *plan.Spec.InitializerResources
 		}
 
 		spec.Template.Spec.InitContainers = append(spec.Template.Spec.InitContainers, initializerContainer)
@@ -337,7 +352,7 @@ func (r *ApplicationReconciler) refreshDeployment(ctx context.Context, ll logr.L
 		Spec: spec,
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r, deploy, func() error {
+	_, err = controllerutil.CreateOrUpdate(ctx, r, deploy, func() error {
 		spec.Replicas = deploy.Spec.Replicas // keep this stable, as HPA will be the one controlling it
 		deploy.Spec = spec
 		deploy.SetLabels(mergeLabels(deploy.GetLabels(), app.GetLabels(), wantLabels))
@@ -397,6 +412,7 @@ func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.Application{}).
 		Owns(&stappsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&autoscaling.HorizontalPodAutoscaler{}).
 		Complete(r)
 }
 
