@@ -32,11 +32,11 @@ install: manifests
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
 	cd config/manager && kustomize edit set image controller=${IMG}
-	kustomize build config/default | kubectl apply -f -
+	kubectl kustomize config/dev | kubectl apply -f -
 
 release: manifests
 	cd config/manager && kustomize edit set image controller=${IMG}
-	kustomize build config/default | tee deploy/poconetes.yaml > /dev/null
+	kubectl kustomize config/default | tee deploy/poconetes.yaml > /dev/null
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
