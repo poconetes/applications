@@ -4,9 +4,5 @@ metadata:
   name: unlock-vault
 spec:
   image: ubuntu
-  args: [ "sh", "-c", "echo $VAR_ON_INIT" ]
-  environment:
-  - name: VAR_ON_INIT
-    value: "HAI, unlocking vault"
-
-## /pocoshare is shared across all containers
+  args: [ "touch", "/pocoshare/secrets" ]
+## /pocoshare is shared across all containers and ephemeral
