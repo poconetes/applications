@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/jetstack/cert-manager v0.15.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/spf13/cobra v0.0.5

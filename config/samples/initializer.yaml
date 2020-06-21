@@ -4,5 +4,5 @@ metadata:
   name: unlock-vault
 spec:
   image: ubuntu
-  args: [ "touch", "/pocoshare/secrets" ]
-## /pocoshare is shared across all containers and ephemeral
+  args: [ "touch", "/poco/share/secrets" ]
+## /poco/share is shared across all containers and ephemeral

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
+	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	appsv1 "github.com/poconetes/applications/api/v1"
 	stappsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
@@ -60,7 +62,7 @@ func (r *FormationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		formation.Status.ObservedGeneration = formation.GetGeneration()
-		return ctrl.Result{}, r.Status().Update(ctx, formation)
+		return ctrl.Result{Requeue: true}, r.Status().Update(ctx, formation)
 	}
 
 	oldStatus := formation.Status
@@ -85,6 +87,9 @@ func (r *FormationReconciler) refreshObjects(ctx context.Context, ll logr.Logger
 	if err := r.refreshService(ctx, ll, formation); err != nil {
 		return err
 	}
+	if err := r.refreshCertificate(ctx, ll, formation); err != nil {
+		return err
+	}
 	if err := r.refreshDeployment(ctx, ll, plan, formation); err != nil {
 		return err
 	}
@@ -93,6 +98,41 @@ func (r *FormationReconciler) refreshObjects(ctx context.Context, ll logr.Logger
 	}
 
 	return nil
+}
+
+func (r *FormationReconciler) refreshCertificate(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) error {
+	wantLabels := map[string]string{
+		appsv1.LabelFormation: formation.GetName(),
+	}
+
+	if formation.Spec.TLS == nil {
+		return nil
+	}
+
+	spec := certmanager.CertificateSpec{
+		SecretName: formation.GetName() + "-mtls",
+		IssuerRef: cmmeta.ObjectReference{
+			Kind: formation.Spec.TLS.Issuer.Kind,
+			Name: formation.Spec.TLS.Issuer.Name,
+		},
+		DNSNames: formation.Spec.TLS.Names,
+	}
+
+	certificate := &certmanager.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       formation.GetNamespace(),
+			Name:            formation.GetName(),
+			Labels:          mergeLabels(formation.GetLabels(), wantLabels),
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(formation, formation.GroupVersionKind())},
+		},
+		Spec: spec,
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r, certificate, func() error {
+		certificate.SetLabels(mergeLabels(certificate.GetLabels(), formation.GetLabels(), wantLabels))
+		return controllerutil.SetControllerReference(formation, certificate, r.Scheme)
+	})
+	return err
 }
 
 func (r *FormationReconciler) refreshService(ctx context.Context, ll logr.Logger, formation *appsv1.Formation) error {
@@ -218,8 +258,8 @@ func (r *FormationReconciler) refreshDeployment(ctx context.Context, ll logr.Log
 
 	defaultMounts := []appsv1.Mount{
 		{
-			Name: "pocoshare",
-			Path: "/pocoshare",
+			Name: "poconetes-share",
+			Path: "/poco/share",
 		},
 	}
 
@@ -228,6 +268,31 @@ func (r *FormationReconciler) refreshDeployment(ctx context.Context, ll logr.Log
 			Name:  "POCO_REVISION",
 			Value: strconv.FormatInt(formation.GetGeneration(), 10),
 		},
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: "poconetes-share",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+
+	if formation.Spec.TLS != nil {
+		defaultMounts = append(defaultMounts, appsv1.Mount{
+			Name: "poconetes-mtls",
+			Path: "/poco/mtls",
+		})
+
+		volumes = append(volumes, corev1.Volume{
+			Name: "poconetes-mtls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: formation.GetName() + "-mtls",
+				},
+			},
+		})
 	}
 
 	spec := stappsv1.DeploymentSpec{
@@ -243,14 +308,8 @@ func (r *FormationReconciler) refreshDeployment(ctx context.Context, ll logr.Log
 				EnableServiceLinks:           boolPtr(false),
 				AutomountServiceAccountToken: boolPtr(false),
 				Affinity:                     plan.Spec.Affinity,
-				Volumes: []corev1.Volume{
-					{
-						Name: "pocoshare",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				},
+				DNSConfig:                    plan.Spec.DNS,
+				Volumes:                      volumes,
 			},
 		},
 	}

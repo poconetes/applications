@@ -10,6 +10,13 @@ const (
 	LabelFormation = "poco-formation"
 )
 
+type FormationTLS struct {
+	// +required
+	Issuer corev1.ObjectReference `json:"issuer"`
+	// +required
+	Names []string `json:"names"`
+}
+
 // FormationSpec defines the desired state of Formation
 type FormationSpec struct {
 	// +required
@@ -22,6 +29,8 @@ type FormationSpec struct {
 	Scaling []autoscaling.MetricSpec `json:"scaling,omitempty"`
 	// +Optional
 	Plan string `json:"plan,omitempty"`
+	// +Optional
+	TLS *FormationTLS `json:"tls,omitempty"`
 
 	RunSpec `json:",inline"`
 }

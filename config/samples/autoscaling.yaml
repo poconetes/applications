@@ -8,6 +8,13 @@ spec:
   image: polinux/stress
   command: ["stress"]
   args: ["--vm", "1", "--vm-bytes", "700M", "--vm-hang", "1"]
+  tls:
+    issuer:
+      kind: ClusterIssuer
+      name: poconetes-internal 
+    names:
+    - autoscaling
+    - autoscaling.default
   scaling:
   - type: Resource
     resource:

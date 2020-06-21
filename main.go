@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
 	appsv1 "github.com/poconetes/applications/api/v1"
 	"github.com/poconetes/applications/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,6 +24,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
+	_ = certmanager.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

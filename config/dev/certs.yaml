@@ -1,0 +1,34 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: poconetes-self-signing
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: poconetes-internal
+  namespace: cert-manager
+spec:
+  secretName: poconetes-internal-ca
+  duration: 8736h # 1 year
+  renewBefore: 240h # 10 days
+  issuerRef:
+    name: poconetes-self-signing
+    kind: Issuer
+  commonName: poconetes-internal-ca
+  usages:
+  - cert sign
+  organization:
+  - Poconetes Internal
+  isCA: true
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: poconetes-internal
+spec:
+  ca:
+    secretName: poconetes-internal-ca

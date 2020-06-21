@@ -23,6 +23,8 @@ type PlanSpec struct {
 	InitializerResources *corev1.ResourceRequirements `json:"initializer_resources,omitempty"`
 	// +optional
 	SidecarResources *corev1.ResourceRequirements `json:"sidecar_resources,omitempty"`
+	// +optional
+	DNS *corev1.PodDNSConfig `json:"dns,omitempty"`
 }
 
 // PlanStatus defines the observed state of Plan
